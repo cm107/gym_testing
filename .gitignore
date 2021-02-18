@@ -3,3 +3,4 @@ __pycache__
 *.pyc
 *.pth
 *.png
+pyclay_gym_testing.egg-info

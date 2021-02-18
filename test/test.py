@@ -1,6 +1,5 @@
 import gym
 import numpy as np
-from logger import logger
 from common_utils.counter_utils import count_list_items
 
 class ValueTracker:
@@ -16,18 +15,18 @@ class ValueTracker:
     def summary(self):
         summary_str = ""
         ordered_list = count_list_items(self.value_list)
-        logger.blue(ordered_list)
+        print(ordered_list)
 
 tracker = ValueTracker()
 
 env = gym.make("CartPole-v1")
-logger.purple(f"env: {env}")
-logger.purple(f"env.action_space: {env.action_space}")
-logger.purple(f"env.observation_space: {env.observation_space}")
-logger.purple(f"env.observation_space.low: {env.observation_space.low}")
-logger.purple(f"env.observation_space.high: {env.observation_space.high}")
-logger.blue(f"env.action_space.contains(0): {env.action_space.contains(0)}")
-logger.cyan(f"gym.envs.registry.all():\n{gym.envs.registry.all()}")
+print(f"env: {env}")
+print(f"env.action_space: {env.action_space}")
+print(f"env.observation_space: {env.observation_space}")
+print(f"env.observation_space.low: {env.observation_space.low}")
+print(f"env.observation_space.high: {env.observation_space.high}")
+print(f"env.action_space.contains(0): {env.action_space.contains(0)}")
+print(f"gym.envs.registry.all():\n{gym.envs.registry.all()}")
 import sys
 sys.exit()
 
@@ -35,13 +34,13 @@ observation = env.reset()
 for _ in range(100):
     env.render()
     action = env.action_space.sample() # your agent here (this takes random actions)
-    logger.purple(action)
+    print(action)
     tracker.add(action)
     observation, reward, done, info = env.step(action)
-    logger.cyan(f"observation: {observation}")
-    logger.cyan(f"reward: {reward}")
-    logger.cyan(f"done: {done}")
-    logger.cyan(f"info: {info}")
+    print(f"observation: {observation}")
+    print(f"reward: {reward}")
+    print(f"done: {done}")
+    print(f"info: {info}")
 
     if done:
         observation = env.reset()
