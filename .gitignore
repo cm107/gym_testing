@@ -4,3 +4,4 @@ __pycache__
 *.pth
 *.png
 pyclay_gym_testing.egg-info
+MUJOCO_LOG.TXT

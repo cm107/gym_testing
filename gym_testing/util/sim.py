@@ -3,12 +3,13 @@ import numpy as np
 from tqdm import tqdm
 from collections import deque
 from ..util.plot import save_score_plot
+from ..agent.basic import Agent
 
 from logger import logger
 from common_utils.check_utils import check_file_exists
 
 def cross_entropy_simulation(
-    agent: torch.nn.Module,
+    agent: Agent,
     n_iterations: int=500, max_t: int=1000, gamma: int=1.0, print_every: int=10, pop_size: int=50, elite_frac: float=0.2, sigma: float=0.5,
     weights_save_path: str='model.pth', plot_save_path: str='score_plot.jpg', resume: str=None
 ) -> list:
@@ -32,16 +33,17 @@ def cross_entropy_simulation(
     if resume is not None:
         check_file_exists(resume)
         state_dict = torch.load(weights_save_path)
-        agent.load_state_dict(state_dict)
+        agent.network.load_state_dict(state_dict)
         logger.info(f"Loaded weights from {resume}")
         raise NotImplementedError
         # best_weight =
         # TODO: Finish implementing
     else:
-        best_weight = sigma*np.random.randn(agent.get_weights_dim())
+        print(f'type(agent): {type(agent)}')
+        best_weight = sigma*np.random.randn(agent.network.get_weights_dim())
 
     for i_iteration in tqdm(range(1, n_iterations+1), total=n_iterations, unit="iter", leave=True):
-        weights_pop = [best_weight + (sigma*np.random.randn(agent.get_weights_dim())) for i in range(pop_size)]
+        weights_pop = [best_weight + (sigma*np.random.randn(agent.network.get_weights_dim())) for i in range(pop_size)]
         rewards = np.array([agent.evaluate(weights, gamma, max_t) for weights in weights_pop])
 
         elite_idxs = rewards.argsort()[-n_elite:]
@@ -53,7 +55,7 @@ def cross_entropy_simulation(
         scores.append(reward)
         
         save_score_plot(scores=scores, save_path=plot_save_path)
-        torch.save(agent.state_dict(), weights_save_path)        
+        torch.save(agent.network.state_dict(), weights_save_path)        
 
         if i_iteration % print_every == 0:
             print('Episode {}\tAverage Score: {:.2f}'.format(i_iteration, np.mean(scores_deque)))

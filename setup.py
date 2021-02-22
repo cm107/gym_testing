@@ -30,7 +30,7 @@ setup(
         'torchvision',
         'gym',
         'pylint==2.4.4',
-        'pyclay-common_utils @ https://github.com/cm107/common_utils/archive/master.zip'
+        'pyclay-streamer @ https://github.com/cm107/streamer/archive/master.zip'
     ],
     python_requires='>=3.7'
 )
