@@ -16,6 +16,7 @@ class Agent:
             h_size=h_size,
             a_size=env.action_space.shape[0]
         )
+        self.network.to(self.device)
         
     def evaluate(self, weights: np.ndarray, gamma=1.0, max_t=5000, render: bool=False, show_pbar: bool=False):
         self.network.set_weights(weights)
@@ -40,8 +41,11 @@ class Agent:
             step_pbar.close()
         return episode_return
 
-    def simulate(self, weights_path: str, gamma=1.0, max_t=5000, render: bool=False, show_pbar: bool=False):
+    def load(self, weights_path: str):
         self.network.load(weights_path)
+
+    def simulate(self, weights_path: str, gamma=1.0, max_t=5000, render: bool=False, show_pbar: bool=False):
+        self.load(weights_path)
         episode_return = 0.0
         state = self.env.reset()
 
@@ -66,14 +70,18 @@ class Agent:
     def train_loop(
         self,
         n_iterations: int=500, max_t: int=1000, gamma: int=1.0, print_every: int=10, pop_size: int=50, elite_frac: float=0.2, sigma: float=0.5,
-        weights_save_path: str='model.pth', plot_save_path: str='score_plot.jpg'
+        weights_save_path: str='model.pth',
+        resume: str=None,
+        plot_save_path: str='score_plot.jpg'
     ):
         n_elite=int(pop_size*elite_frac)
-
         scores_deque = deque(maxlen=100)
         scores = []
 
-        best_weight = sigma*np.random.randn(self.network.get_weights_dim())
+        if resume is None:
+            best_weight = sigma*np.random.randn(self.network.get_weights_dim())
+        else:
+            raise NotImplementedError
 
         iter_pbar = tqdm(total=n_iterations, unit='iter', leave=True)
         for i_iteration in tqdm(range(1, n_iterations+1), total=n_iterations, unit="iter", leave=True):

@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing import Dict
+from collections import OrderedDict
 
 class BasicRLNetwork(nn.Module):
     def __init__(self, s_size: int, h_size: int, a_size: int):
@@ -39,7 +41,33 @@ class BasicRLNetwork(nn.Module):
         self.fc1.bias.data.copy_(fc1_b.view_as(self.fc1.bias.data))
         self.fc2.weight.data.copy_(fc2_W.view_as(self.fc2.weight.data))
         self.fc2.bias.data.copy_(fc2_b.view_as(self.fc2.bias.data))
-    
+
+    # def get_weights0(self) -> Dict[str, np.ndarray]:
+    #     result = OrderedDict()
+    #     for k, v in self.state_dict().items():
+    #         result[k] = v.cpu().numpy()
+    #     return result
+
+    # def set_weights0(self, weights: Dict[str, np.ndarray], device):        
+    #     for k, v in weights.items():
+    #         val = torch.from_numpy(v).to(device)
+    #         layer_name = k.replace('.weight', '').replace('.bias', '')
+    #         if k.endswith('.weight'):
+    #             attr_name = 'weight'
+    #         elif k.endswith('.bias'):
+    #             attr_name = 'bias'
+    #         else:
+    #             raise Exception
+    #         self.__dict__['_modules'][layer_name].__dict__['_parameters'][attr_name] = val
+
+    # def init_weights(self):
+    #     def func(m):
+    #         if type(m) == nn.Linear:
+    #             nn.init.xavier_uniform(m.weight, gain=1.0)
+    #             m.bias.data.fill_(0.01)
+
+    #     self.apply(func)
+
     def get_weights_dim(self) -> int:
         return (self.s_size+1)*self.h_size + (self.h_size+1)*self.a_size
     
