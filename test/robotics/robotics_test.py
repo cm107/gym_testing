@@ -87,7 +87,11 @@ while True:
     #     print(action)
     env.render()
     # next_state, reward, done, _ = env.step(action)
-    next_state, reward, done, _ = env.step(RobotArmAction.random(include=['x', 'y']).to_list())
+    next_state, reward, done, _ = env.step(RobotArmAction.random(
+        include=['x', 'y']
+        # include=['g']
+    ).to_list())
+    # next_state, reward, done, _ = env.step(RobotArmAction(0, 0, 0, 1).to_list())
     next_state = RobotArmState.from_dict(next_state)
     # print(next_state)
     # state = next_state
