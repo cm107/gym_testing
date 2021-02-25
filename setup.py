@@ -29,6 +29,8 @@ setup(
         'torch',
         'torchvision',
         'gym',
+        'mpi4py', # For parallel environments?
+        'psutil', # process and system utilities
         'pylint==2.4.4',
         'pyclay-streamer @ https://github.com/cm107/streamer/archive/master.zip'
     ],

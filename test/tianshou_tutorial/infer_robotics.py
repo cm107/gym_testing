@@ -30,7 +30,7 @@ render = 1 / 100 # 1 / FPS
 # env = gym.make(task)
 # state_shape = env.observation_space.shape or env.observation_space.n
 # action_shape = env.action_space.shape or env.action_space.n
-reward_type = 'dense_on_move_else_sparse'
+reward_type = 'custom'
 env = FetchPickAndPlaceEnv(reward_type=reward_type)
 state_shape = env.observation_space['observation'].shape or env.observation_space['observation'].n
 action_shape = env.action_space.shape or env.action_space.n
@@ -49,7 +49,7 @@ policy = DQNPolicy(
     net, optim, gamma, n_step,
     target_update_freq=target_update_freq
 )
-policy.load_state_dict(torch.load(f'log/{task}/dqn0/policy.pth'))
+policy.load_state_dict(torch.load(f'log/{task}/dqn/policy.pth'))
 
 # Let's watch its performance!
 policy.eval()
