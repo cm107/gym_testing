@@ -7,9 +7,6 @@ from mujoco_py import GlfwContext
 from streamer.recorder.stream_writer import StreamWriter
 from common_utils.cv_drawing_utils import draw_text_rows_in_corner
 import time
-
-GlfwContext(offscreen=True)
-
 from mujoco_py.generated import const
 
 
@@ -25,6 +22,8 @@ class Play:
         self.device = device("cuda" if torch.cuda.is_available() else "cpu")
         if video_save is not None or show_preview:
             self.stream_writer = StreamWriter(video_save_path=video_save, fps=30, show_preview=show_preview)
+            if show_preview:
+                GlfwContext(offscreen=True)
         else:
             self.stream_writer = None
 
