@@ -32,6 +32,8 @@ for env_name in env_name_list:
     trainer.train(
         max_epochs=200, max_cycles=50,
         max_episodes=2, num_updates=40,
+        n_timesteps=50, nontrivial_goal_thresh=0.05,
+        penalize_actions=True,
         plot_save_path=plot_path,
         plot_include=['success', 'actor', 'critic'],
         log_dir=log_dir

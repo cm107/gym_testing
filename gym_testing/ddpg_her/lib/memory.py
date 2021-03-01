@@ -11,10 +11,13 @@ class Memory:
         self.memory_length = 0
         self.env = env
 
+        # The larger the k_future, the closer future_p is to 1.
+        # future_p ranges from 0 to 1 on [0, k_future]
+        # (0,1), (1/3, 1/4), (1/2, 1/3), (2/3, 2/5), (1, 1/2), (2, 2/3), ...
         self.future_p = 1 - (1. / (1 + k_future))
 
     def sample(self, batch_size):
-
+        # Sample for Standard Experience Replay
         ep_indices = np.random.randint(0, len(self.memory), batch_size)
         time_indices = np.random.randint(0, len(self.memory[0]["next_state"]), batch_size)
         states = []
@@ -36,6 +39,7 @@ class Memory:
         next_achieved_goals = np.vstack(next_achieved_goals)
         next_states = np.vstack(next_states)
 
+        # Sample for Hindsight Experience Replay (HER)
         her_indices = np.where(np.random.uniform(size=batch_size) < self.future_p)
         future_offset = np.random.uniform(size=batch_size) * (len(self.memory[0]["next_state"]) - time_indices)
         future_offset = future_offset.astype(int)
@@ -46,7 +50,7 @@ class Memory:
             future_ag.append(dc(self.memory[episode]["achieved_goal"][f_offset]))
         future_ag = np.vstack(future_ag)
 
-        desired_goals[her_indices] = future_ag
+        desired_goals[her_indices] = future_ag # Overwrite SER achieved_goals with HER achieved_goals at her_indices. Proportion is determined by self.future_p
         rewards = np.expand_dims(self.env.compute_reward(next_achieved_goals, desired_goals, None), 1)
 
         return self.clip_obs(states), actions, rewards, self.clip_obs(next_states), self.clip_obs(desired_goals)

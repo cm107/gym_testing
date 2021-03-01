@@ -51,7 +51,7 @@ class Agent:
     def choose_action(self, state, goal, train_mode=True):
         state = self.state_normalizer.normalize(state)
         goal = self.goal_normalizer.normalize(goal)
-        state = np.expand_dims(state, axis=0)
+        state = np.expand_dims(state, axis=0) # Note: np.expand_dims is often used together with np.concatenate
         goal = np.expand_dims(goal, axis=0)
 
         with torch.no_grad():
@@ -59,10 +59,13 @@ class Agent:
             x = from_numpy(x).float().to(self.device)
             action = self.actor(x)[0].cpu().data.numpy()
 
-        if train_mode:
+        if train_mode: # Augmentation
+            # Add random vector to action vector (random vals range from 0 to 0.2). Clipped to bounds afterwards.
+            # This encourages movement.
             action += 0.2 * np.random.randn(self.n_actions)
             action = np.clip(action, self.action_bounds[0], self.action_bounds[1])
 
+            # Adds (random_actions - action) to 30% of the actions in the action vector. Encourages change of directions occasionally?
             random_actions = np.random.uniform(low=self.action_bounds[0], high=self.action_bounds[1],
                                                size=self.n_actions)
             action += np.random.binomial(1, 0.3, 1)[0] * (random_actions - action)
@@ -87,9 +90,11 @@ class Agent:
         for t_params, e_params in zip(target_model.parameters(), local_model.parameters()):
             t_params.data.copy_(tau * e_params.data + (1 - tau) * t_params.data)
 
-    def train(self):
-        states, actions, rewards, next_states, goals = self.memory.sample(self.batch_size)
+    def train(self, penalize_actions: bool=True):
+        states, actions, rewards, next_states, goals = self.memory.sample(self.batch_size) # HER logic is in here. Samples from both SER and HER.
 
+        # I don't quite understand this normalization yet, but it's doing x = (x - x_mean) / x_std
+        # This centers the data at 0 and scales it based on the standard deviation.
         states = self.state_normalizer.normalize(states)
         next_states = self.state_normalizer.normalize(next_states)
         goals = self.goal_normalizer.normalize(goals)
@@ -102,16 +107,32 @@ class Agent:
         actions = torch.Tensor(actions).to(self.device)
 
         with torch.no_grad():
-            target_q = self.critic_target(next_inputs, self.actor_target(next_inputs))
-            target_returns = rewards + self.gamma * target_q.detach()
+            # The is the Q-function.
+            # target_returns corresponds to the expected return (where the discounted sum of future rewards is called a return)
+            # The goal is to maximize target_returns.
+            # The actor tries to find the action that gets the most return while the critic guesses what the return will be?
+            # self.critic_target and self.actor_target are used to predict the target_q with pred_next_actions (as inference without backprop)
+            # Notice that target_returns is calculated as rewards + self.gamma * target_q. High rewards are coming from HER, so those need to be used too.
+            # self.critic is used to predict the current returns (q_eval) with the given inputs and given actions (not inferred) (with backprop)
+            # The critic has a lower loss if the returns that it predicted with the predicted next actions is close to the returns predicted with the given current acions.
+            # In doing so, it learns how to predict more accurate future returns.
+            # The actor loss increases as the critic's predicted reward gets more negative and the actor's predicted action vector gets bigger.
+            # (the q value is negative because we are working with negative rewards where rewards close to 0 are good)
+            # (The magnitude of the action vector is considered here probably in order to encourage short and efficient movements.)
+            # Note that there should be some high rewards coming out frequently due to HER, even if the desired_goal and original achieved_goal are way off.
+
+            pred_next_actions = self.actor_target(next_inputs)
+            target_q = self.critic_target(next_inputs, pred_next_actions)
+            target_returns = rewards + self.gamma * target_q.detach() # Bellman equation (optimal Q-function)
             target_returns = torch.clamp(target_returns, -1 / (1 - self.gamma), 0)
 
         q_eval = self.critic(inputs, actions)
         critic_loss = (target_returns - q_eval).pow(2).mean()
 
         a = self.actor(inputs)
-        actor_loss = -self.critic(inputs, a).mean()
-        actor_loss += a.pow(2).mean()
+        actor_loss = -self.critic(inputs, a).mean() # This can be found in the article for HER.
+        if penalize_actions:
+            actor_loss += a.pow(2).mean() # This isn't in the article for HER. Could this be causing problems in systems with large action vectors?
 
         self.actor_optim.zero_grad()
         actor_loss.backward()

@@ -21,7 +21,11 @@ class Play:
         self.agent.set_to_eval_mode()
         self.device = device("cuda" if torch.cuda.is_available() else "cpu")
         if video_save is not None or show_preview:
-            self.stream_writer = StreamWriter(video_save_path=video_save, fps=30, show_preview=show_preview)
+            self.stream_writer = StreamWriter(
+                video_save_path=video_save,
+                fps=self.env.env.metadata['video.frames_per_second'],
+                show_preview=show_preview
+            )
             if show_preview:
                 GlfwContext(offscreen=True)
         else:
