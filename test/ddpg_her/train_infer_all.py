@@ -3,16 +3,16 @@ from gym_testing.ddpg_her.infer import DDPG_HER_Inferer
 from common_utils.file_utils import make_dir_if_not_exists, delete_all_files_in_dir
 
 env_name_list = [
-    'FetchPickAndPlace-v1',
-    'FetchPush-v1',
-    'FetchReach-v1',
-    'FetchSlide-v1',
+    # 'FetchPickAndPlace-v1',
+    # 'FetchPush-v1',
+    # 'FetchReach-v1',
+    # 'FetchSlide-v1',
     'HandManipulateBlock-v0',
     'HandManipulateEgg-v0',
     'HandManipulatePen-v0',
     'HandReach-v0'
 ]
-output_root_dir = 'robotics_output'
+output_root_dir = 'robotics_output-epoch2000'
 make_dir_if_not_exists(output_root_dir)
 
 for env_name in env_name_list:
@@ -22,15 +22,17 @@ for env_name in env_name_list:
     log_dir = f'{env_root_dir}/logs'
     plot_path = f'{env_root_dir}/plot.png'
     weight_path = f'{env_root_dir}/model.pth'
+    best_weight_path = f'{env_root_dir}/best.pth'
     infer_video_path = f'{env_root_dir}/infer_video.avi'
 
     print(f'========{env_name}=========')
     trainer = DDPG_HER_Trainer(
         weight_path=weight_path,
-        env_name=env_name
+        env_name=env_name,
+        best_weight_path=best_weight_path
     )
     trainer.train(
-        max_epochs=200, max_cycles=50,
+        max_epochs=2000, max_cycles=50,
         max_episodes=2, num_updates=40,
         n_timesteps=50, nontrivial_goal_thresh=0.05,
         penalize_actions=True,

@@ -20,7 +20,8 @@ class DDPG_HER_Trainer(DDPG_HER_Base):
         critic_lr: float=1e-3,
         gamma: float=0.98,
         tau: float=0.05,
-        k_future: int=4
+        k_future: int=4,
+        best_weight_path: str=None
     ):
         super().__init__(
             weight_path=weight_path,
@@ -37,6 +38,9 @@ class DDPG_HER_Trainer(DDPG_HER_Base):
         self.t_success_rate = None
         self.total_ac_loss = None
         self.total_cr_loss = None
+
+        # Other
+        self.best_weight_path = best_weight_path
 
     def reset_metadata(self):
         self.t_success_rate = []
@@ -192,6 +196,7 @@ class DDPG_HER_Trainer(DDPG_HER_Base):
         log_writer = SummaryWriter(log_dir) if log_dir is not None else None
 
         self.reset_metadata()
+        best_success_rate = None
         for epoch in range(max_epochs):
             start_time = time.time()
             epoch_actor_loss = 0
@@ -241,6 +246,10 @@ class DDPG_HER_Trainer(DDPG_HER_Base):
                     f"Critic_Loss:{critic_loss:.3f}| "
                     f"Success rate:{success_rate:.3f}| "
                     f"{to_gb(ram.used):.1f}/{to_gb(ram.total):.1f} GB RAM")
+                if best_success_rate is None or success_rate > best_success_rate:
+                    best_success_rate = success_rate
+                    if self.best_weight_path is not None:
+                        self.agent.save_weights(self.best_weight_path)
                 self.agent.save_weights(self.weight_path)
                 if plot_save_path is not None:
                     self.save_plot(
