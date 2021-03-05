@@ -24,6 +24,7 @@ for env_name in env_name_list:
     weight_path = f'{env_root_dir}/model.pth'
     best_weight_path = f'{env_root_dir}/best.pth'
     infer_video_path = f'{env_root_dir}/infer_video.avi'
+    best_infer_video_path = f'{env_root_dir}/best_infer_video.avi'
 
     print(f'========{env_name}=========')
     trainer = DDPG_HER_Trainer(
@@ -48,5 +49,15 @@ for env_name in env_name_list:
         max_episode=100,
         show_details=True,
         video_save=infer_video_path,
+        show_preview=False
+    )
+    inferer = DDPG_HER_Inferer(
+        weight_path=best_weight_path,
+        env_name=env_name
+    )
+    inferer.run(
+        max_episode=100,
+        show_details=True,
+        video_save=best_infer_video_path,
         show_preview=False
     )
