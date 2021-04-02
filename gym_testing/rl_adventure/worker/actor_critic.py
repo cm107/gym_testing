@@ -7,12 +7,13 @@ import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 import time
-from typing import List, Dict
+from typing import List, Dict, cast
 
 from streamer.recorder.stream_writer import StreamWriter
 
 from ..util import get_device, make_dir_if_not_exists
 from ..env_util import make_env, make_env_list
+from ..multiprocessing_env import SubprocVecEnv
 from ..network.actor_critic import ActorCritic
 
 class ExperienceSegment:
@@ -54,18 +55,19 @@ class ActorCriticWorker:
     def __init__(self, output_dir: str='output', env_name: str="CartPole-v0", run_id: str="0"):
         self.device = get_device()
         self.env_name = env_name
-        self.envs = make_env_list(env_name=self.env_name, num_envs=16) # Environment batch
+        # self.envs = make_env_list(env_name=self.env_name, num_envs=16) # Environment batch
+        self.envs = cast(SubprocVecEnv, None) # Environment batch used for training
         self.env = make_env(env_name=self.env_name) # Test environment
 
-        print(f"self.envs.observation_space: {self.envs.observation_space}")
-        print(f"self.envs.action_space: {self.envs.action_space}")
+        print(f"self.env.observation_space: {self.env.observation_space}")
+        print(f"self.env.action_space: {self.env.action_space}")
 
-        num_inputs = self.envs.observation_space.shape[0]
-        if not isinstance(self.envs.action_space, gym.spaces.discrete.Discrete):
-            num_outputs = self.envs.action_space.shape[0]
+        num_inputs = self.env.observation_space.shape[0]
+        if not isinstance(self.env.action_space, gym.spaces.discrete.Discrete):
+            num_outputs = self.env.action_space.shape[0]
             self.is_discrete_action = False
         else:
-            num_outputs = self.envs.action_space.n
+            num_outputs = self.env.action_space.n
             self.is_discrete_action = True
         self.model = ActorCritic(
             num_inputs=num_inputs,
@@ -80,6 +82,7 @@ class ActorCriticWorker:
         make_dir_if_not_exists(output_dir)
         env_dir = f"{output_dir}/{env_name}"
         make_dir_if_not_exists(env_dir)
+        self.run_id = run_id
         self.run_dir = f"{env_dir}/{run_id}"
         make_dir_if_not_exists(self.run_dir)
         self.model_path = f'{self.run_dir}/model.pth'
@@ -231,6 +234,7 @@ class ActorCriticWorker:
         save_step_size: int=1000,
         reward_threshold: float=None, max_train_time: float=None
     ):
+        self.envs = make_env_list(env_name=self.env_name, num_envs=16) # Environment batch
         state = self.envs.reset() # num_envs (16) x num_observations (4)
         
         metadata = MetaData()
@@ -366,7 +370,8 @@ class ActorCriticWorker:
                     break
         pbar.close()
     
-    def infer(self, num_frames: int=100, delay: float=1/20, video_save: str=None):
+    def infer(self, num_frames: int=100, delay: float=1/20, video_save: str=None, show_reward: bool=True, show_details: bool=True):
+        from common_utils.cv_drawing_utils import draw_text_rows_in_corner
         self.model.load(self.model_path)
         self.model.eval()
         if video_save is not None:
@@ -383,14 +388,42 @@ class ActorCriticWorker:
             stream_writer.step(img)
         else:
             env.render()
+
+        cumulative_reward = 0
         for i in range(num_frames):
             state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
             dist, _ = self.model(state)
             next_state, reward, done, _ = env.step(dist.sample().cpu().numpy()[0])
+            cumulative_reward += reward
             state = next_state
             if stream_writer is not None:
                 img = env.render(mode='rgb_array')
                 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                if show_reward:
+                    img = draw_text_rows_in_corner(
+                        img=img,
+                        row_text_list=[
+                            f"Reward: {reward}",
+                            f"Cumulative Reward: {cumulative_reward}"
+                        ],
+                        row_height=img.shape[0]*0.04,
+                        thickness=1,
+                        color=[255, 0, 0],
+                        corner='topleft'
+                    )
+                if show_details:
+                    img = draw_text_rows_in_corner(
+                        img=img,
+                        row_text_list=[
+                            f"Env: {self.env_name}",
+                            f"Run ID: {self.run_id}"
+                        ],
+                        row_height=img.shape[0]*0.04,
+                        thickness=1,
+                        color=[255, 0, 0],
+                        corner='bottomleft'
+                    )
+
                 stream_writer.step(img)
             else:
                 env.render()
