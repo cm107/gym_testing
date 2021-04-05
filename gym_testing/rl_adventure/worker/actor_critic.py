@@ -158,6 +158,8 @@ class ActorCriticWorker:
 
     def _accumulate_experience_segment(self, segment_length: int, state, use_ppo: bool=False) -> ExperienceSegment:
         segment = ExperienceSegment()
+        if isinstance(self.env.observation_space, gym.spaces.box.Box):
+            state = state / self.env.observation_space.high
 
         for _ in range(segment_length):
             state = torch.FloatTensor(state).to(self.device)
@@ -168,6 +170,8 @@ class ActorCriticWorker:
                 segment.next_state, reward, done, _ = self.envs.step(action.cpu().numpy())
             else:
                 segment.next_state, reward, done, _ = self.envs.step(action.cpu().numpy()) # np.ndarray of the next_state, reward, done for each environment
+            if isinstance(self.env.observation_space, gym.spaces.box.Box):
+                segment.next_state = segment.next_state / self.env.observation_space.high
 
             log_prob = dist.log_prob(action) # shape (num_envs,). This is the log probability of the sampled action for each env.
             segment.entropy += dist.entropy().mean() # dist.entropy() is of shape (num_envs,). This is adding the average entropy across all envs.

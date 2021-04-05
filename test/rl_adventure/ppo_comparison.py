@@ -11,7 +11,7 @@ from streamer.recorder.stream_writer import StreamWriter
 src_root_dir = 'output-ppo_comparison'
 dst_root_dir = f'{src_root_dir}/comparison'
 make_dir_if_not_exists(dst_root_dir)
-env_names = [dirname for dirname in get_dirnames_in_dir(src_root_dir) if dirname != 'comparison']
+env_names = [dirname for dirname in get_dirnames_in_dir(src_root_dir) if dirname != 'comparison' and 'ram' in dirname]
 for env_name in env_names:
     src_env_dir = f'{src_root_dir}/{env_name}'
     dst_env_dir = f'{dst_root_dir}/{env_name}'
