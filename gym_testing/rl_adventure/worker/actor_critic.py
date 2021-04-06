@@ -353,7 +353,7 @@ class ActorCriticWorker:
             metadata.time_elapsed.append(time.time() - metadata.start_time)
             if frame_idx % save_step_size == 0:
                 test_reward = np.mean([self._test_env(vis=False) for _ in range(10)])
-                if test_reward > max(metadata.test_rewards):
+                if len(metadata.test_rewards) == 0 or test_reward > max(metadata.test_rewards):
                     self.model.save(self.best_model_path)
                 metadata.test_rewards.append(test_reward)
 
