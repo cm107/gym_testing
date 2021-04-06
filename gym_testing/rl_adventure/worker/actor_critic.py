@@ -14,7 +14,7 @@ from streamer.recorder.stream_writer import StreamWriter
 from ..util import get_device, make_dir_if_not_exists
 from ..env_util import make_env, make_env_list
 from ..multiprocessing_env import SubprocVecEnv
-from ..network.actor_critic import ActorCritic
+from ..network.actor_critic import ActorCritic, VisualActorCritic
 
 class ExperienceSegment:
     def __init__(self):
@@ -62,20 +62,37 @@ class ActorCriticWorker:
         print(f"self.env.observation_space: {self.env.observation_space}")
         print(f"self.env.action_space: {self.env.action_space}")
 
-        num_inputs = self.env.observation_space.shape[0]
         if not isinstance(self.env.action_space, gym.spaces.discrete.Discrete):
             num_outputs = self.env.action_space.shape[0]
             self.is_discrete_action = False
         else:
             num_outputs = self.env.action_space.n
             self.is_discrete_action = True
-        self.model = ActorCritic(
-            num_inputs=num_inputs,
-            num_outputs=num_outputs,
-            hidden_size=256,
-            std=0.0,
-            is_discrete_action=self.is_discrete_action
-        ).to(self.device)
+        if not isinstance(self.env.observation_space, gym.spaces.box.Box):
+            num_inputs = self.env.observation_space.shape[0]
+            self.is_image_observation = False
+            self.model = ActorCritic(
+                num_inputs=num_inputs,
+                num_outputs=num_outputs,
+                hidden_size=256,
+                std=0.0,
+                is_discrete_action=self.is_discrete_action
+            ).to(self.device)
+            self.is_image_observation = False
+        else:
+            # Make sure that observation is an image.
+            assert len(self.env.observation_space.shape) == 3 # (h, w, c)
+            assert self.env.observation_space.shape[2] == 3
+            self.model = VisualActorCritic(
+                obs_spec=self.env.observation_space,
+                num_outputs=num_outputs,
+                hidden_size=256,
+                std=0.0,
+                is_discrete_action=self.is_discrete_action
+            ).to(self.device)
+            self.is_image_observation = True
+        print(f'Model Class: {type(self.model).__name__}')
+
         self.optimizer = optim.Adam(self.model.parameters())
 
         # Prepare output dir
@@ -113,7 +130,10 @@ class ActorCriticWorker:
         total_reward = 0
         frame_idx = 0
         while True:
-            state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+            if not self.is_image_observation:
+                state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+            else:
+                state = torch.FloatTensor(state.transpose((2, 0, 1))).unsqueeze(0).to(self.device)
             dist, _ = self.model(state)
             action = dist.sample().cpu().numpy()[0]
             next_state, reward, done, _ = self.env.step(action)
@@ -162,9 +182,18 @@ class ActorCriticWorker:
             state = state / self.env.observation_space.high
 
         for _ in range(segment_length):
-            state = torch.FloatTensor(state).to(self.device)
+            if not self.is_image_observation:
+                state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+            else:
+                state = torch.FloatTensor(state.transpose((0, 3, 1, 2))).to(self.device)
             dist, value = self.model(state)
 
+            # import random
+            # if random.random() < 0.10:
+            #     action = dist.sample()
+            #     action = torch.LongTensor([self.env.action_space.sample() for i in range(state.size()[0])]).to(self.device)
+            # else:
+            #     action = dist.sample() # sample the action for each environment
             action = dist.sample() # sample the action for each environment
             if self.is_discrete_action:
                 segment.next_state, reward, done, _ = self.envs.step(action.cpu().numpy())
@@ -236,9 +265,10 @@ class ActorCriticWorker:
         gamma: float=0.99, tau: float=0.95,
         use_gae: bool=False, use_ppo: bool=False,
         save_step_size: int=1000,
+        num_envs: int=16,
         reward_threshold: float=None, max_train_time: float=None
     ):
-        self.envs = make_env_list(env_name=self.env_name, num_envs=16) # Environment batch
+        self.envs = make_env_list(env_name=self.env_name, num_envs=num_envs) # Environment batch
         state = self.envs.reset() # num_envs (16) x num_observations (4)
         
         metadata = MetaData()
@@ -251,6 +281,10 @@ class ActorCriticWorker:
             frame_idx += num_steps
 
             next_state = torch.FloatTensor(segment.next_state).to(self.device)
+            if not self.is_image_observation:
+                next_state = torch.FloatTensor(segment.next_state).to(self.device)
+            else:
+                next_state = torch.FloatTensor(segment.next_state.transpose((0, 3, 1, 2))).to(self.device)
             _, next_value = self.model(next_state)
 
             # actual action-value calculated from segment sample
@@ -395,7 +429,10 @@ class ActorCriticWorker:
 
         cumulative_reward = 0
         for i in range(num_frames):
-            state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+            if not self.is_image_observation:
+                state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+            else:
+                state = torch.FloatTensor(state.transpose((2, 0, 1))).unsqueeze(0).to(self.device)
             dist, _ = self.model(state)
             next_state, reward, done, _ = env.step(dist.sample().cpu().numpy()[0])
             cumulative_reward += reward
