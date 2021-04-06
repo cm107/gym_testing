@@ -103,6 +103,7 @@ class ActorCriticWorker:
         self.run_dir = f"{env_dir}/{run_id}"
         make_dir_if_not_exists(self.run_dir)
         self.model_path = f'{self.run_dir}/model.pth'
+        self.best_model_path = f'{self.run_dir}/best.pth'
     
     def _plot(self, xdata: list, ydata: list, title: str='data', save_filename: str='plot.png'):
         plt.figure(figsize=(5,5))
@@ -352,6 +353,8 @@ class ActorCriticWorker:
             metadata.time_elapsed.append(time.time() - metadata.start_time)
             if frame_idx % save_step_size == 0:
                 test_reward = np.mean([self._test_env(vis=False) for _ in range(10)])
+                if test_reward > max(metadata.test_rewards):
+                    self.model.save(self.best_model_path)
                 metadata.test_rewards.append(test_reward)
 
                 metadata.avg_train_losses.append(np.average(metadata.train_losses))
@@ -408,9 +411,9 @@ class ActorCriticWorker:
                     break
         pbar.close()
     
-    def infer(self, num_frames: int=100, delay: float=1/20, video_save: str=None, show_reward: bool=True, show_details: bool=True):
+    def infer(self, num_frames: int=100, delay: float=1/20, video_save: str=None, show_reward: bool=True, show_details: bool=True, use_best: bool=False):
         from common_utils.cv_drawing_utils import draw_text_rows_in_corner
-        self.model.load(self.model_path)
+        self.model.load(self.model_path if not use_best else self.best_model_path)
         self.model.eval()
         if video_save is not None:
             save_path = f'{self.run_dir}/{video_save}'

@@ -66,9 +66,9 @@ print(f'len(env_name_list): {len(env_name_list)}')
 gamma = 0.99
 tau = 0.95
 
-for env_name in env_name_list:
-    for use_gae in [True, False]:
-        for use_ppo in [True, False]:
+for use_gae in [True, False]:
+    for use_ppo in [True, False]:
+        for env_name in env_name_list:
             run_id = f"gamma{gamma}-tau{tau}"
             if use_gae:
                 run_id = f"{run_id}-gae"
@@ -84,10 +84,11 @@ for env_name in env_name_list:
                 output_dir='output_atari-debug'
             )
             worker.train(
-                num_steps=100, max_frames=20000*20,
+                num_steps=100, max_frames=20000*20*4,
                 gamma=gamma, tau=tau,
                 use_gae=use_gae, use_ppo=use_ppo,
                 num_envs=16,
-                max_train_time=15 # in minutes
+                max_train_time=15*4 # in minutes
             )
-            worker.infer(num_frames=500, delay=1/20, video_save='infer.avi')
+            # worker.infer(num_frames=500, delay=1/20, video_save='final.avi', use_best=False)
+            # worker.infer(num_frames=500, delay=1/20, video_save='best.avi', use_best=True)
