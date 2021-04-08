@@ -32,8 +32,9 @@ class ExperienceSegment:
         self.states = []
         self.actions = []
 
-class MetaData:
+class MetaData(BasicLoadableObject['MetaData']):
     def __init__(self):
+        super().__init__()
         self.frame_idx_list = []
         self.sampled_frame_idx_list = []
         self.test_rewards = []
@@ -57,6 +58,7 @@ class MetaData:
         self.sampled_time_elapsed = []
 
         self.working_clip_param = None
+        
 
 class TrainConfig(BasicLoadableObject['TrainConfig']):
     def __init__(
@@ -111,7 +113,6 @@ class TrainConfig(BasicLoadableObject['TrainConfig']):
         cfg = TrainConfig()
         cfg.horizon = 128
         cfg.lr = 2.5e-4
-        cfg.final_lr = 2.5e-6
         cfg.ppo_epochs = 3
         cfg.mini_batch_size = 32 # 1/4 of horizon
         cfg.gamma = 0.99
@@ -120,6 +121,7 @@ class TrainConfig(BasicLoadableObject['TrainConfig']):
         cfg.clip_param = 0.1
         cfg.vf_coeff = 1
         cfg.entropy_coeff = 0.01
+        cfg.max_frames = 40000000
         return cfg
 
 class ActorCriticWorker:
@@ -520,6 +522,7 @@ class ActorCriticWorker:
                     # Note: This threshold is in minutes
                     break
             step_count += 1
+        metadata.save_to_path(f'{self.run_dir}/metadata.json', overwrite=True)
         pbar.close()
     
     def infer(self, num_frames: int=100, delay: float=1/20, video_save: str=None, show_reward: bool=True, show_details: bool=True, use_best: bool=False):
