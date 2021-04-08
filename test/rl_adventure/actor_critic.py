@@ -1,4 +1,4 @@
-from gym_testing.rl_adventure.worker.actor_critic import ActorCriticWorker
+from gym_testing.rl_adventure.worker.actor_critic import ActorCriticWorker, TrainConfig
 
 classic_control_env_name_list = [
     # 'Acrobot-v1',
@@ -35,25 +35,12 @@ atari_env_name_list = [
     'Alien-v0',
     'Amidar-v0',
     'Assault-v0',
-    'Asterix-v0'
+    'Asterix-v0',
     'Asteroids-v0',
     'Atlantis-v0',
     'BankHeist-v0',
     'BattleZone-v0',
 ]
-
-# TODO: Try Space Invaders
-# Using Visual Encoder at https://arxiv.org/pdf/1312.5602v1.pdf
-"""
-We now describe the exact architecture used for all seven Atari games. The input to the neural
-network consists is an 84 × 84 × 4 image produced by φ. The first hidden layer convolves 16 8 × 8
-filters with stride 4 with the input image and applies a rectifier nonlinearity [10, 18]. The second
-hidden layer convolves 32 4 × 4 filters with stride 2, again followed by a rectifier nonlinearity. The
-final hidden layer is fully-connected and consists of 256 rectifier units. The output layer is a fullyconnected linear layer with a single output for each valid action.
-The number of valid actions varied
-between 4 and 18 on the games we considered. We refer to convolutional networks trained with our
-approach as Deep Q-Networks (DQN).
-"""
 
 env_name_list = []
 env_name_list += classic_control_env_name_list
@@ -81,14 +68,13 @@ for use_gae in [True, False]:
 
             worker = ActorCriticWorker(
                 env_name=env_name, run_id=run_id,
-                output_dir='output_atari-debug'
+                output_dir='output_atari-debug',
+                # output_dir='temp',
             )
-            worker.train(
-                num_steps=100, max_frames=20000*20*4,
-                gamma=gamma, tau=tau,
-                use_gae=use_gae, use_ppo=use_ppo,
-                num_envs=16,
-                max_train_time=15*4 # in minutes
-            )
+            cfg = TrainConfig.get_atari_config()
+            cfg.use_gae = use_gae
+            cfg.use_ppo = use_ppo
+            cfg.max_frames = 300000
+            worker.train(cfg=cfg)
             # worker.infer(num_frames=500, delay=1/20, video_save='final.avi', use_best=False)
             # worker.infer(num_frames=500, delay=1/20, video_save='best.avi', use_best=True)
