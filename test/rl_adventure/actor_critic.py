@@ -31,15 +31,15 @@ atari_ram_env_name_list = [
 # uses image as observation
 atari_env_name_list = [
     'SpaceInvaders-v0',
-    # 'AirRaid-v0',
-    # 'Alien-v0',
-    # 'Amidar-v0',
-    # 'Assault-v0',
-    # 'Asterix-v0',
-    # 'Asteroids-v0',
-    # 'Atlantis-v0',
-    # 'BankHeist-v0',
-    # 'BattleZone-v0',
+    'AirRaid-v0',
+    'Alien-v0',
+    'Amidar-v0',
+    'Assault-v0',
+    'Asterix-v0',
+    'Asteroids-v0',
+    'Atlantis-v0',
+    'BankHeist-v0',
+    'BattleZone-v0',
 ]
 
 env_name_list = []
@@ -74,6 +74,6 @@ for use_gae in [True, False]:
             cfg = TrainConfig.get_atari_config()
             cfg.use_gae = use_gae
             cfg.use_ppo = use_ppo
-            worker.train(cfg=cfg)
-            # worker.infer(num_frames=1000, delay=1/20, video_save='final.avi', use_best=False)
-            # worker.infer(num_frames=1000, delay=1/20, video_save='best.avi', use_best=True)
+            # worker.train(cfg=cfg)
+            worker.infer(num_frames=1000, delay=1/20, video_save='final.avi', use_best=False)
+            worker.infer(num_frames=1000, delay=1/20, video_save='best.avi', use_best=True)
