@@ -41,7 +41,7 @@ os.makedirs(output_dir, exist_ok=True)
 for env_name in atari_env_name_list:
     log_dir = f'{output_dir}/{env_name}'
     env = gym.make(env_name)
-    callback = SaveCallback(save_path=f'{log_dir}/current.zip', freq=100)
+    callback = SaveCallback(save_path=f'{log_dir}/current', freq=10)
 
     env0 = gym.make(env_name)
     n_frames = int(5e4)
