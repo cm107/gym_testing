@@ -26,17 +26,17 @@ class SaveCallback(BaseCallback):
 
 atari_env_name_list = [
     'SpaceInvaders-v0',
-    'AirRaid-v0',
-    'Alien-v0',
-    'Amidar-v0',
-    'Assault-v0',
-    'Asterix-v0',
-    'Asteroids-v0',
-    'Atlantis-v0',
-    'BankHeist-v0',
-    'BattleZone-v0',
+    # 'AirRaid-v0',
+    # 'Alien-v0',
+    # 'Amidar-v0',
+    # 'Assault-v0',
+    # 'Asterix-v0',
+    # 'Asteroids-v0',
+    # 'Atlantis-v0',
+    # 'BankHeist-v0',
+    # 'BattleZone-v0',
 ]
-output_dir = 'atari_output'
+output_dir = 'atari_output0'
 os.makedirs(output_dir, exist_ok=True)
 for env_name in atari_env_name_list:
     log_dir = f'{output_dir}/{env_name}'

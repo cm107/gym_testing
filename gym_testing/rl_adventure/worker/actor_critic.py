@@ -15,7 +15,8 @@ from streamer.recorder.stream_writer import StreamWriter
 from common_utils.base.basic import BasicLoadableObject
 
 from ..util import get_device, make_dir_if_not_exists
-from ..env_util import make_env, make_env_list
+from ..env_util import make_env, make_env_list, \
+    get_atari_env
 from ..multiprocessing_env import SubprocVecEnv
 from ..network.actor_critic import ActorCritic, VisualActorCritic
 
@@ -109,7 +110,6 @@ class TrainConfig(BasicLoadableObject['TrainConfig']):
         """https://arxiv.org/pdf/1707.06347.pdf
         Refer to Table 5.
         """
-        # TODO: Implement scaling of adam stepsize and clipping parameter that decreases from 1 to 0 over the course of the training session
         cfg = TrainConfig()
         cfg.horizon = 128
         cfg.lr = 2.5e-4
@@ -121,16 +121,36 @@ class TrainConfig(BasicLoadableObject['TrainConfig']):
         cfg.clip_param = 0.1
         cfg.vf_coeff = 1
         cfg.entropy_coeff = 0.01
-        cfg.max_frames = 40000000
+        cfg.max_frames = 10000000
+        return cfg
+
+    @classmethod
+    def get_atari_baseline_config(cls) -> TrainConfig:
+        cfg = TrainConfig()
+        cfg.horizon = 128
+        cfg.lr = 2.5e-4
+        cfg.ppo_epochs = 4
+        cfg.mini_batch_size = 32 # 1/4 of horizon
+        cfg.gamma = 0.99
+        cfg.tau = 0.95
+        cfg.num_envs = 8
+        cfg.clip_param = 0.1
+        cfg.vf_coeff = 0.5
+        cfg.entropy_coeff = 0.01
+        cfg.max_frames = 10000000
         return cfg
 
 class ActorCriticWorker:
-    def __init__(self, output_dir: str='output', env_name: str="CartPole-v0", run_id: str="0"):
+    def __init__(self, output_dir: str='output', env_name: str="CartPole-v0", run_id: str="0", is_atari: bool=False):
         self.device = get_device()
         self.env_name = env_name
+        self.is_atari = is_atari
         # self.envs = make_env_list(env_name=self.env_name, num_envs=16) # Environment batch
         self.envs = cast(SubprocVecEnv, None) # Environment batch used for training
-        self.env = make_env(env_name=self.env_name) # Test environment
+        if not self.is_atari: # under testing
+            self.env = make_env(env_name=self.env_name, is_atari=self.is_atari, clip_reward=False, terminal_on_life_loss=False) # Test environment
+        else:
+            self.env = get_atari_env(env_id=self.env_name, training=True, is_eval=True, frame_stack=4, n_envs=1, log_dir='logs')
 
         print(f"self.env.observation_space: {self.env.observation_space}")
         print(f"self.env.action_space: {self.env.action_space}")
@@ -155,7 +175,11 @@ class ActorCriticWorker:
         else:
             # Make sure that observation is an image.
             assert len(self.env.observation_space.shape) == 3 # (h, w, c)
-            assert self.env.observation_space.shape[2] == 3
+            if not self.is_atari:
+                assert self.env.observation_space.shape[2] == 3
+            else:
+                # assert self.env.observation_space.shape[2] == 1
+                pass
             self.model = VisualActorCritic(
                 obs_spec=self.env.observation_space,
                 num_outputs=num_outputs,
@@ -206,10 +230,21 @@ class ActorCriticWorker:
             if not self.is_image_observation:
                 state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
             else:
-                state = torch.FloatTensor(state.transpose((2, 0, 1))).unsqueeze(0).to(self.device)
+                if not self.is_atari:
+                    state = torch.FloatTensor(state.transpose((2, 0, 1))).unsqueeze(0).to(self.device)
+                else:
+                    # print(f'state.shape: {state.shape}')
+                    # import sys
+                    # sys.exit()
+                    state = torch.FloatTensor(state.transpose((0, 3, 1, 2))).to(self.device)
+                    # print(f"state.size(): {state.size()}")
+                    # self.state = state
             dist, _ = self.model(state)
             action = dist.sample().cpu().numpy()[0]
-            next_state, reward, done, _ = self.env.step(action)
+            if not self.is_atari:
+                next_state, reward, done, _ = self.env.step(action)
+            else:
+                next_state, reward, done, _ = self.env.step([action])
             state = next_state
             if vis:
                 self.env.render()
@@ -248,7 +283,11 @@ class ActorCriticWorker:
     def _accumulate_experience_segment(self, cfg: TrainConfig, state) -> ExperienceSegment:
         segment = ExperienceSegment()
         if isinstance(self.env.observation_space, gym.spaces.box.Box):
-            state = state / self.env.observation_space.high
+            if not self.is_atari:
+                state = state / self.env.observation_space.high
+            else:
+                # state = state / 255.0
+                pass
 
         for _ in range(cfg.horizon):
             if not self.is_image_observation:
@@ -269,7 +308,11 @@ class ActorCriticWorker:
             else:
                 segment.next_state, reward, done, _ = self.envs.step(action.cpu().numpy()) # np.ndarray of the next_state, reward, done for each environment
             if isinstance(self.env.observation_space, gym.spaces.box.Box):
-                segment.next_state = segment.next_state / self.env.observation_space.high
+                if not self.is_atari:
+                    segment.next_state = segment.next_state / self.env.observation_space.high
+                else:
+                    # segment.next_state = segment.next_state / 255.0
+                    pass
 
             log_prob = dist.log_prob(action) # shape (num_envs,). This is the log probability of the sampled action for each env.
             segment.entropy += dist.entropy().mean() # dist.entropy() is of shape (num_envs,). This is adding the average entropy across all envs.
@@ -421,7 +464,11 @@ class ActorCriticWorker:
             pass
         cfg.save_to_path(self.train_cfg_path, overwrite=True)
 
-        self.envs = make_env_list(env_name=self.env_name, num_envs=cfg.num_envs) # Environment batch
+        if not self.is_atari: # under testing
+            self.envs = make_env_list(env_name=self.env_name, num_envs=cfg.num_envs, is_atari=self.is_atari) # Environment batch
+        else:
+            self.envs = get_atari_env(env_id=self.env_name, training=True, is_eval=False, frame_stack=4, n_envs=cfg.num_envs, log_dir='logs')
+
         optimizer = optim.Adam(self.model.parameters(), lr=cfg.lr)
         assert len(optimizer.param_groups) == 1
 
@@ -443,7 +490,7 @@ class ActorCriticWorker:
             # Use fixed-length segments of experience (e.g. 20 timesteps)
             # to compute estimators of the returns and advantage function
             segment = self._accumulate_experience_segment(cfg=cfg, state=state)
-            frame_idx += cfg.horizon
+            frame_idx += (cfg.horizon * cfg.num_envs)
 
             next_state = torch.FloatTensor(segment.next_state).to(self.device)
             if not self.is_image_observation:
@@ -508,6 +555,7 @@ class ActorCriticWorker:
             metadata.working_clip_param = anneal_coeff * cfg.clip_param
 
             if step_count % cfg.save_step_size == 0:
+                # print('Eval')
                 test_reward = np.mean([self._test_env(vis=False) for _ in range(10)])
                 if len(metadata.test_rewards) == 0 or test_reward >= max(metadata.test_rewards):
                     self.model.save(self.best_model_path)
@@ -535,7 +583,10 @@ class ActorCriticWorker:
         else:
             stream_writer = None
 
-        env = make_env(env_name=self.env_name)
+        if not self.is_atari:
+            env = make_env(env_name=self.env_name, is_atari=self.is_atari, clip_reward=False, terminal_on_life_loss=False)
+        else:
+            env = get_atari_env(env_id=self.env_name, training=False, is_eval=False, frame_stack=4, n_envs=1, log_dir='logs')
         state = env.reset()
         if stream_writer is not None:
             img = env.render(mode='rgb_array')
@@ -549,9 +600,15 @@ class ActorCriticWorker:
             if not self.is_image_observation:
                 state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
             else:
-                state = torch.FloatTensor(state.transpose((2, 0, 1))).unsqueeze(0).to(self.device)
+                if not self.is_atari:
+                    state = torch.FloatTensor(state.transpose((2, 0, 1))).unsqueeze(0).to(self.device)
+                else:
+                    state = torch.FloatTensor(state.transpose((0, 3, 1, 2))).to(self.device)
             dist, _ = self.model(state)
-            next_state, reward, done, _ = env.step(dist.sample().cpu().numpy()[0])
+            if not self.is_atari:
+                next_state, reward, done, _ = env.step(dist.sample().cpu().numpy()[0])
+            else:
+                next_state, reward, done, _ = env.step([dist.sample().cpu().numpy()[0]])
             cumulative_reward += reward
             state = next_state
             if stream_writer is not None:
@@ -586,6 +643,8 @@ class ActorCriticWorker:
             else:
                 env.render()
             time.sleep(delay)
+            if done:
+                env.reset()
         env.close()
         if stream_writer is not None:
             stream_writer.close()

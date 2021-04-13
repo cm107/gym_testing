@@ -167,6 +167,7 @@ class SimpleVisualEncoder(nn.Module):
     def forward(self, visual_obs: torch.Tensor) -> torch.Tensor:
         # if not exporting_to_onnx.is_exporting():
         #     visual_obs = visual_obs.permute([0, 3, 1, 2])
+        # print(f'visual_obs.size(): {visual_obs.size()}')
         hidden = self.conv_layers(visual_obs)
         hidden = hidden.reshape(-1, self.final_flat)
         return self.dense(hidden)
@@ -203,7 +204,6 @@ class VisualActorCritic(nn.Module):
 
     def forward(self, x) -> (torch.Tensor, Categorical):
         hidden = self.vis_encoder(x)
-        # print(f'hidden: {hidden}')
         value = self.critic(hidden) # num_envs x 1
         if not self.is_discrete_action:
             # Calculation of dist changes because there is no Softmax
