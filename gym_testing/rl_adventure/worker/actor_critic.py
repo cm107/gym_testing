@@ -200,6 +200,8 @@ class ActorCriticWorker:
         self.model_path = f'{self.run_dir}/model.pth'
         self.best_model_path = f'{self.run_dir}/best.pth'
         self.train_cfg_path = f'{self.run_dir}/train_config.yaml'
+
+        self.normalize_images = True
     
     def _plot(self, xdata: list, ydata: list, title: str='data', save_filename: str='plot.png'):
         plt.figure(figsize=(5,5))
@@ -227,6 +229,13 @@ class ActorCriticWorker:
         total_reward = 0
         frame_idx = 0
         while True:
+            if isinstance(self.env.observation_space, gym.spaces.box.Box):
+                if not self.is_atari:
+                    state = state / self.env.observation_space.high
+                elif self.normalize_images:
+                    state = state / 255.0
+                else:
+                    pass
             if not self.is_image_observation:
                 state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
             else:
@@ -285,8 +294,9 @@ class ActorCriticWorker:
         if isinstance(self.env.observation_space, gym.spaces.box.Box):
             if not self.is_atari:
                 state = state / self.env.observation_space.high
+            elif self.normalize_images:
+                state = state / 255.0
             else:
-                # state = state / 255.0
                 pass
 
         for _ in range(cfg.horizon):
@@ -294,6 +304,10 @@ class ActorCriticWorker:
                 state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
             else:
                 state = torch.FloatTensor(state.transpose((0, 3, 1, 2))).to(self.device)
+            # print(f'state.min(): {state.min()}')
+            # print(f'state.max(): {state.max()}')
+            # print(f'state.mean(): {state.mean()}')
+            # print(f'state.median(): {state.median()}')
             dist, value = self.model(state)
 
             # import random
@@ -310,8 +324,9 @@ class ActorCriticWorker:
             if isinstance(self.env.observation_space, gym.spaces.box.Box):
                 if not self.is_atari:
                     segment.next_state = segment.next_state / self.env.observation_space.high
+                elif self.normalize_images:
+                    segment.next_state = segment.next_state / 255.0
                 else:
-                    # segment.next_state = segment.next_state / 255.0
                     pass
 
             log_prob = dist.log_prob(action) # shape (num_envs,). This is the log probability of the sampled action for each env.
@@ -500,7 +515,9 @@ class ActorCriticWorker:
             _, next_value = self.model(next_state)
 
             # actual action-value calculated from segment sample
+            # print(f'segment.rewards: {segment.rewards}')
             returns = self._compute_returns(cfg, segment, next_value)
+            # print(f'returns: {returns}')
 
             # Detaching log_probs and values here seems to cause problems in non-PPO mode?
             if not cfg.use_ppo:
@@ -597,6 +614,13 @@ class ActorCriticWorker:
 
         cumulative_reward = 0
         for i in range(num_frames):
+            if isinstance(env.observation_space, gym.spaces.box.Box):
+                if not self.is_atari:
+                    state = state / env.observation_space.high
+                elif self.normalize_images:
+                    state = state / 255.0
+                else:
+                    pass
             if not self.is_image_observation:
                 state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
             else:

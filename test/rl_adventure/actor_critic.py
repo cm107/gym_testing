@@ -68,13 +68,13 @@ for use_gae in [True]:
 
             worker = ActorCriticWorker(
                 env_name=env_name, run_id=run_id,
-                output_dir='output_atari-debug-40M-atarienv',
-                # output_dir='temp',
+                # output_dir='output_atari-debug-40M-atarienv',
+                output_dir='temp',
                 is_atari=True
             )
             cfg = TrainConfig.get_atari_baseline_config()
             cfg.use_gae = use_gae
             cfg.use_ppo = use_ppo
-            # worker.train(cfg=cfg)
-            worker.infer(num_frames=1000, delay=1/20, video_save='final.avi', use_best=False, show_reward=False)
-            worker.infer(num_frames=1000, delay=1/20, video_save='best.avi', use_best=True, show_reward=False)
+            worker.train(cfg=cfg)
+            # worker.infer(num_frames=1000, delay=1/20, video_save='final.avi', use_best=False, show_reward=False)
+            # worker.infer(num_frames=1000, delay=1/20, video_save='best.avi', use_best=True, show_reward=False)
